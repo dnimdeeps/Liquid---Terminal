@@ -1,13 +1,12 @@
 'use client';
 import { WalletConnect } from '@/components/WalletConnect';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAccount, useWriteContract, useWaitForTransactionReceipt, useReadContract, useChainId } from 'wagmi';
 import { parseEther } from 'viem';
 import { CONTRACTS, FACTORY_ABI } from '@/lib/contracts';
 import { useProtocolStats } from '@/lib/useProtocolStats';
 import { ProtocolStatsBar } from '@/components/ProtocolStatsBar';
-import { useEffect, useState } from 'react';
 
 const CHAINLINK_ETH_USD_ABI = [
   { inputs: [], name: 'latestRoundData', outputs: [{ internalType: 'uint80', name: 'roundId', type: 'uint80' }, { internalType: 'int256', name: 'answer', type: 'int256' }, { internalType: 'uint256', name: 'startedAt', type: 'uint256' }, { internalType: 'uint256', name: 'updatedAt', type: 'uint256' }, { internalType: 'uint80', name: 'answeredInRound', type: 'uint80' }], stateMutability: 'view', type: 'function' }
@@ -210,9 +209,9 @@ export default function Terminal() {
                 </div>
               </div>
 
-              {(txError || writeError) && (
+              {txError && (
                 <div className="border border-red-500/30 bg-red-500/5 p-4 text-xs font-mono text-red-400 leading-relaxed">
-                  ⚠ {txError || (writeError as { shortMessage?: string })?.shortMessage || writeError?.message}
+                  ⚠ {txError}
                 </div>
               )}
 
