@@ -1,8 +1,13 @@
 'use client';
 
-import dynamic from 'next/dynamic';
+import { ConnectButton } from '@rainbow-me/rainbowkit';
 
-export const WalletConnect = dynamic(
-  () => import('@rainbow-me/rainbowkit').then((mod) => mod.ConnectButton),
-  { ssr: false }
-);
+
+export function WalletConnect() {
+
+  return (
+    <div className="flex items-center gap-4">
+      <ConnectButton />
+    </div>
+  );
+}

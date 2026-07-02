@@ -7,12 +7,14 @@ import "../src/Marketplace.sol";
 
 contract DeployScript is Script {
     function run() external {
-        // Use Anvil's default account 0 private key
-        uint256 deployerPrivateKey = 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80;
-        vm.startBroadcast(deployerPrivateKey);
+        // Use the private key provided via the CLI flag
+        vm.startBroadcast();
 
         PartitionFactory factory = new PartitionFactory();
-        Marketplace marketplace = new Marketplace();
+
+        // Arbitrum One Native USDC address
+        address usdcAddress = 0xaf88d065e77c8cC2239327C5EDb3A432268e5831;
+        Marketplace marketplace = new Marketplace(address(factory), usdcAddress);
 
         console.log("PartitionFactory deployed at:", address(factory));
         console.log("Marketplace deployed at:", address(marketplace));

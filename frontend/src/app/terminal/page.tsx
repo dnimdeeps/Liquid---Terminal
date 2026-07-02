@@ -1,10 +1,12 @@
 'use client';
 import { WalletConnect } from '@/components/WalletConnect';
 import Link from 'next/link';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useAccount, useWriteContract, useWaitForTransactionReceipt, useReadContract, useChainId } from 'wagmi';
-import { parseEther, formatEther } from 'viem';
+import { parseEther } from 'viem';
 import { CONTRACTS, FACTORY_ABI } from '@/lib/contracts';
+import { useProtocolStats } from '@/lib/useProtocolStats';
+import { ProtocolStatsBar } from '@/components/ProtocolStatsBar';
 
 export default function Terminal() {
   const [totalEth, setTotalEth] = useState('10');
@@ -16,34 +18,22 @@ export default function Terminal() {
 
   const numPartitions = Math.min(Math.max(Number(partitions) || 1, 1), 60);
   const ethPerPartition = Number(totalEth) / numPartitions || 0;
+  const totalWei = ethPerPartition * 1e18;
 
   const contractAddresses = CONTRACTS[chainId as keyof typeof CONTRACTS];
   const factoryAddress = contractAddresses?.FACTORY as `0x${string}` | undefined;
+  const isArbitrum = chainId === 42161;
 
-  // Read user's existing partitions
-  const { data: userPartitions, refetch: refetchPartitions } = useReadContract({
-    address: factoryAddress,
-    abi: FACTORY_ABI,
-    functionName: 'getUserPartitions',
-    args: address ? [address] : undefined,
-    query: { enabled: !!address && !!factoryAddress },
-  });
+  const { totalPartitionsEver, activeListingCount } = useProtocolStats();
 
   // Write: deploy partition wallets
   const { data: txHash, isPending, writeContract, error: writeError } = useWriteContract();
 
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash: txHash });
 
-  useEffect(() => {
-    if (isConfirmed) refetchPartitions();
-  }, [isConfirmed, refetchPartitions]);
-
-  useEffect(() => {
-    if (writeError) setTxError(writeError.shortMessage || writeError.message);
-  }, [writeError]);
-
   const handleDeploy = () => {
-    if (!factoryAddress) return setTxError('Unsupported network — connect to Anvil or Arbitrum');
+    if (!isArbitrum) return setTxError('Please switch to Arbitrum One to use this protocol.');
+    if (!factoryAddress) return setTxError('Contract not yet deployed — awaiting mainnet deployment.');
     if (!totalEth || !partitions) return;
     setTxError(null);
     writeContract({
@@ -66,8 +56,27 @@ export default function Terminal() {
           <div className="w-4 h-4 border border-[#D4AF37] rotate-45"></div>
           Liquid Terminal
         </Link>
-        <WalletConnect />
+        <div className="flex gap-6 items-center">
+          <div className="flex items-center gap-2 text-[9px] font-mono">
+            {isArbitrum ? (
+              <><span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse"></span><span className="text-green-400 uppercase tracking-widest">Arbitrum One</span></>
+            ) : (
+              <><span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span><span className="text-red-400 uppercase tracking-widest">Wrong Network</span></>
+            )}
+          </div>
+          <Link href="/dashboard" className="text-xs font-mono uppercase tracking-[0.2em] text-[#888888] hover:text-white transition-colors">Portfolio</Link>
+          <WalletConnect />
+        </div>
       </nav>
+
+      <ProtocolStatsBar />
+
+      {/* Wrong network banner */}
+      {isConnected && !isArbitrum && (
+        <div className="w-full bg-red-900/30 border-b border-red-500/40 px-8 py-3 text-xs font-mono text-red-400 flex items-center gap-2">
+          ⚠ This protocol is deployed on <strong className="text-red-300">Arbitrum One</strong> only. Please switch your wallet network.
+        </div>
+      )}
 
       <main className="flex-1 w-full max-w-[1500px] mx-auto p-8 mt-4 z-10 flex flex-col lg:flex-row gap-16">
 
@@ -114,16 +123,34 @@ export default function Terminal() {
                 </div>
               </div>
 
-              <div className="pt-8 border-t border-[#D4AF37]/10">
-                <div className="flex justify-between items-end mb-3">
-                  <span className="text-[10px] uppercase tracking-[0.3em] text-[#888888]">Size per Wallet</span>
+              <div className="pt-8 border-t border-[#D4AF37]/10 space-y-3">
+                <div className="flex justify-between items-end">
+                  <span className="text-[10px] uppercase tracking-[0.3em] text-[#888888]">Size per Vault</span>
                   <span className="font-serif text-4xl text-[#D4AF37]">{ethPerPartition.toFixed(4)}</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="border border-[#1A1A1A] bg-[#0A0A0A] p-2">
+                    <div className="text-[8px] font-mono text-[#555555] uppercase tracking-[0.15em]">Total Partitions Protocol</div>
+                    <div className="text-sm font-serif text-white mt-1">{totalPartitionsEver ?? '—'}</div>
+                  </div>
+                  <div className="border border-[#1A1A1A] bg-[#0A0A0A] p-2">
+                    <div className="text-[8px] font-mono text-[#555555] uppercase tracking-[0.15em]">Active OTC Listings</div>
+                    <div className="text-sm font-serif text-white mt-1">{activeListingCount}</div>
+                  </div>
+                  <div className="border border-[#1A1A1A] bg-[#0A0A0A] p-2">
+                    <div className="text-[8px] font-mono text-[#555555] uppercase tracking-[0.15em]">Est. Gas (Arbitrum)</div>
+                    <div className="text-sm font-serif text-green-400 mt-1">~$0.01 USD</div>
+                  </div>
+                  <div className="border border-[#1A1A1A] bg-[#0A0A0A] p-2">
+                    <div className="text-[8px] font-mono text-[#555555] uppercase tracking-[0.15em]">This Deploy Total ETH</div>
+                    <div className="text-sm font-serif text-white mt-1">{Number(totalEth) || 0} ETH</div>
+                  </div>
                 </div>
               </div>
 
-              {txError && (
+              {(txError || writeError) && (
                 <div className="border border-red-500/30 bg-red-500/5 p-4 text-xs font-mono text-red-400 leading-relaxed">
-                  ⚠ {txError}
+                  ⚠ {txError || (writeError as { shortMessage?: string })?.shortMessage || writeError?.message}
                 </div>
               )}
 
@@ -146,21 +173,11 @@ export default function Terminal() {
             </div>
           </div>
 
-          {/* My Wallets list */}
-          {userPartitions && userPartitions.length > 0 && (
-            <div className="mt-8 glass-panel p-6">
-              <h2 className="text-xs uppercase tracking-[0.3em] text-[#888888] mb-4">My Partition Wallets</h2>
-              <div className="space-y-3 max-h-60 overflow-y-auto" style={{ scrollbarWidth: 'thin', scrollbarColor: '#2A2A2A #050505' }}>
-                {(userPartitions as string[]).map((addr, i) => (
-                  <div key={addr} className="flex items-center justify-between border-b border-[#1A1A1A] pb-3">
-                    <span className="text-[10px] font-mono text-[#555555]">#{i + 1}</span>
-                    <span className="text-[11px] font-mono text-[#888888]">{addr.slice(0, 10)}...{addr.slice(-6)}</span>
-                    <span className="text-[9px] font-mono text-[#D4AF37] border border-[#D4AF37]/20 px-2 py-1">Active</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          <div className="mt-8 flex justify-center">
+             <Link href="/dashboard" className="text-xs font-mono uppercase tracking-[0.2em] border border-[#2A2A2A] text-[#888888] hover:text-[#D4AF37] hover:border-[#D4AF37] px-6 py-4 w-full text-center transition-all bg-[#050505]/50">
+               Access Portfolio Dashboard →
+             </Link>
+          </div>
         </div>
 
         {/* Right Column: Graphic Representation */}

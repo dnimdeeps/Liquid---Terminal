@@ -1,85 +1,119 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import {PartitionWallet} from "./PartitionWallet.sol";
+import {ReentrancyGuard} from "openzeppelin-contracts/contracts/utils/ReentrancyGuard.sol";
+import {IERC721} from "openzeppelin-contracts/contracts/token/ERC721/IERC721.sol";
+import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
+import {PartitionFactory} from "./PartitionFactory.sol";
 
-contract Marketplace {
+contract Marketplace is ReentrancyGuard {
+    PartitionFactory public immutable factory;
+    IERC20 public immutable usdc;
+
     struct Listing {
         address seller;
-        uint256 price; // Asking price in ETH
+        uint256 price;
         bool isActive;
+        uint256 arrayIndex;
     }
 
-    // Mapping from wallet address to its listing
-    mapping(address => Listing) public listings;
+    mapping(uint256 => Listing) public listings;
+    uint256[] public activeListings;
 
-    event Listed(address indexed wallet, address indexed seller, uint256 price);
-    event Purchased(address indexed wallet, address indexed buyer, uint256 price);
-    event Delisted(address indexed wallet, address indexed seller);
+    struct ListingDetails {
+        uint256 tokenId;
+        address wallet;
+        address seller;
+        uint256 price;
+    }
 
-    // To list safely, the Marketplace provides a helper function that expects
-    // the wallet owner to have already called transferOwnership(address(this))
-    // However, to prevent front-running, we pass the original owner explicitly and 
-    // verify the marketplace is the owner now.
-    
-    function listWallet(address wallet, uint256 price) external {
-        PartitionWallet pw = PartitionWallet(payable(wallet));
+    event Listed(uint256 indexed tokenId, address indexed seller, uint256 price);
+    event Purchased(uint256 indexed tokenId, address indexed buyer, uint256 price);
+    event Delisted(uint256 indexed tokenId, address indexed seller);
+
+    constructor(address _factory, address _usdc) {
+        factory = PartitionFactory(_factory);
+        usdc = IERC20(_usdc);
+    }
+
+    function getActiveListingsDetails() external view returns (ListingDetails[] memory) {
+        ListingDetails[] memory details = new ListingDetails[](activeListings.length);
+        for (uint i = 0; i < activeListings.length; i++) {
+            uint256 tid = activeListings[i];
+            Listing storage l = listings[tid];
+            details[i] = ListingDetails({
+                tokenId: tid,
+                wallet: factory.getWalletAddress(tid),
+                seller: l.seller,
+                price: l.price
+            });
+        }
+        return details;
+    }
+
+    function listWallet(uint256 tokenId, uint256 price) external {
+        require(factory.ownerOf(tokenId) == msg.sender, "Not NFT owner");
+        require(!listings[tokenId].isActive, "Already listed");
         
-        // Ensure marketplace owns the wallet
-        require(pw.owner() == address(this), "Marketplace must be owner");
-        
-        // Ensure not already listed
-        require(!listings[wallet].isActive, "Already listed");
+        // Ensure marketplace is approved
+        require(
+            factory.getApproved(tokenId) == address(this) || 
+            factory.isApprovedForAll(msg.sender, address(this)),
+            "Marketplace not approved"
+        );
 
-        // The caller is the seller
-        listings[wallet] = Listing({
+        listings[tokenId] = Listing({
             seller: msg.sender,
             price: price,
-            isActive: true
+            isActive: true,
+            arrayIndex: activeListings.length
         });
+        
+        activeListings.push(tokenId);
 
-        emit Listed(wallet, msg.sender, price);
+        emit Listed(tokenId, msg.sender, price);
     }
 
-    function buyWallet(address wallet) external payable {
-        Listing storage listing = listings[wallet];
+    function buyWallet(uint256 tokenId) external nonReentrant {
+        Listing storage listing = listings[tokenId];
         require(listing.isActive, "Not for sale");
-        require(msg.value >= listing.price, "Insufficient payment");
 
         address seller = listing.seller;
         uint256 price = listing.price;
 
-        // Mark inactive
         listing.isActive = false;
+        _removeListing(tokenId);
 
-        // Transfer funds to seller
-        (bool success, ) = seller.call{value: price}("");
-        require(success, "Payment to seller failed");
+        // Transfer USDC from buyer to seller
+        require(usdc.transferFrom(msg.sender, seller, price), "USDC transfer failed");
 
-        // Refund excess
-        if (msg.value > price) {
-            (bool refundSuccess, ) = msg.sender.call{value: msg.value - price}("");
-            require(refundSuccess, "Refund failed");
-        }
+        // Transfer NFT to buyer via standard ERC721
+        factory.transferFrom(seller, msg.sender, tokenId);
 
-        // Transfer ownership of the wallet to the buyer
-        PartitionWallet pw = PartitionWallet(payable(wallet));
-        pw.transferOwnership(msg.sender);
-
-        emit Purchased(wallet, msg.sender, price);
+        emit Purchased(tokenId, msg.sender, price);
     }
 
-    function delistWallet(address wallet) external {
-        Listing storage listing = listings[wallet];
+    function delistWallet(uint256 tokenId) external {
+        Listing storage listing = listings[tokenId];
         require(listing.isActive, "Not for sale");
         require(listing.seller == msg.sender, "Only seller can delist");
 
         listing.isActive = false;
+        _removeListing(tokenId);
 
-        // Return ownership to seller
-        PartitionWallet pw = PartitionWallet(payable(wallet));
-        pw.transferOwnership(msg.sender);
-
-        emit Delisted(wallet, msg.sender);
+        emit Delisted(tokenId, msg.sender);
+    }
+    
+    function _removeListing(uint256 tokenId) internal {
+        uint256 index = listings[tokenId].arrayIndex;
+        uint256 lastIndex = activeListings.length - 1;
+        
+        if (index != lastIndex) {
+            uint256 lastTokenId = activeListings[lastIndex];
+            activeListings[index] = lastTokenId;
+            listings[lastTokenId].arrayIndex = index;
+        }
+        
+        activeListings.pop();
     }
 }
