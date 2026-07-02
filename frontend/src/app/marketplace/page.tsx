@@ -10,6 +10,10 @@ import { ProtocolStatsBar } from '@/components/ProtocolStatsBar';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Info, ShieldAlert, Key, Zap, Lock, Unlock } from 'lucide-react';
 
+const CHAINLINK_ETH_USD_ABI = [
+  { inputs: [], name: 'latestRoundData', outputs: [{ internalType: 'uint80', name: 'roundId', type: 'uint80' }, { internalType: 'int256', name: 'answer', type: 'int256' }, { internalType: 'uint256', name: 'startedAt', type: 'uint256' }, { internalType: 'uint256', name: 'updatedAt', type: 'uint256' }, { internalType: 'uint80', name: 'answeredInRound', type: 'uint80' }], stateMutability: 'view', type: 'function' }
+] as const;
+
 function Tooltip({ children, text }: { children: React.ReactNode, text: string }) {
   const [show, setShow] = useState(false);
   return (
@@ -131,7 +135,7 @@ export default function Marketplace() {
         </motion.div>
 
         {/* Orderbook Table */}
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="flex-1 border border-[#2A2A2A] bg-[#050505] overflow-hidden flex flex-col relative shadow-[0_0_50px_rgba(0,0,0,0.8)] rounded-sm mt-4">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="flex-1 border border-[#2A2A2A] bg-[#050505] overflow-visible flex flex-col relative shadow-[0_0_50px_rgba(0,0,0,0.8)] rounded-sm mt-4">
           <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-[#D4AF37]/50 to-transparent"></div>
 
           {/* Table Header */}
@@ -169,6 +173,7 @@ export default function Marketplace() {
                     isConnected={isConnected} 
                     marketplaceAddress={marketplaceAddress}
                     usdcAddress={usdcAddress}
+                    chainId={chainId}
                   />
                 ))}
               </AnimatePresence>
@@ -180,7 +185,7 @@ export default function Marketplace() {
   );
 }
 
-function ListingRow({ index, listing, address, isConnected, marketplaceAddress, usdcAddress }: any) {
+function ListingRow({ index, listing, address, isConnected, marketplaceAddress, usdcAddress, chainId }: any) {
   const { data: balanceData } = useBalance({ address: listing.wallet });
   
   // Get allowance
@@ -206,9 +211,14 @@ function ListingRow({ index, listing, address, isConnected, marketplaceAddress, 
   const balanceEth = balanceData ? formatEther(balanceData.value) : '0';
   const balanceNumber = Number(balanceEth);
 
-  // Approximate ETH price for discount calculation (e.g., $3000)
-  // In a real app we'd fetch live ETH price, but we assume 3000 here for MVP display
-  const ethPriceUsd = 3000;
+  // Fetch live ETH price from Chainlink for discount calculation
+  const { data: priceData } = useReadContract({
+    address: '0x639Fe6ab55C921f74e7fac1ee960C0B6293ba612',
+    abi: CHAINLINK_ETH_USD_ABI,
+    functionName: 'latestRoundData',
+    query: { refetchInterval: 30000, enabled: chainId === 42161 },
+  });
+  const ethPriceUsd = priceData ? Number((priceData as any)[1]) / 1e8 : 0;
   const vaultNavUsd = balanceNumber * ethPriceUsd;
 
   let discount = 0;
