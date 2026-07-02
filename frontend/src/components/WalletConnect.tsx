@@ -7,7 +7,7 @@ export function WalletConnect() {
 
   return (
     <div className="flex items-center gap-4">
-      <ConnectButton />
+      <ConnectButton showBalance={false} />
     </div>
   );
 }
