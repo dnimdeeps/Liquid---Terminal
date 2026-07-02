@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <!-- Solid Dark Background -->
+  <rect width="512" height="512" rx="128" fill="#050505" />
+  
+  <!-- Subtle gold glow/border effect -->
+  <rect x="24" y="24" width="464" height="464" rx="104" stroke="#D4AF37" stroke-width="4" stroke-opacity="0.15" />
+  
+  <!-- Glowing Hexagon/Diamond outline representing the "Vault" -->
+  <path d="M256 80L408 168V344L256 432L104 344V168L256 80Z" stroke="#D4AF37" stroke-width="8" stroke-opacity="0.3" stroke-linejoin="round"/>
+
+  <!-- Liquid Terminal / Code Prompt symbol inside the Vault -->
+  <!-- Left Chevron ">" -->
+  <path d="M180 200L250 256L180 312" stroke="#D4AF37" stroke-width="36" stroke-linecap="square" stroke-linejoin="miter"/>
+  
+  <!-- Underscore/Block Cursor "_" -->
+  <rect x="270" y="280" width="60" height="32" fill="#D4AF37" />
+  
+  <!-- Tiny subtle accent dot representing the "liquid" drop -->
+  <circle cx="300" cy="220" r="12" fill="#FDF5E6" />
+</svg>
