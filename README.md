@@ -1,7 +1,7 @@
 # Liquid Terminal: Token-Bound OTC Protocol
 
 ## Executive Summary
-Liquid Terminal is a decentralized Over-The-Counter (OTC) marketplace designed to bridge institutional liquidity with retail buyers. It allows users with large asset holdings to partition their capital into smaller, fixed-balance smart contract wallets. 
+Liquid Terminal is a decentralized Over-The-Counter (OTC) marketplace designed to bridge institutional liquidity with retail buyers. It allows users with large asset holdings to partition their capital into smaller, fixed-balance smart contract vaults. 
 
 Instead of trading raw tokens and suffering massive slippage on Decentralized Exchanges (DEXs), **Liquid Terminal shifts the paradigm from trading tokens to trading the cryptographic Vaults that hold the tokens.**
 
@@ -17,7 +17,7 @@ To understand Liquid Terminal, you must understand the difference between tradit
 2. **The Key (ERC-721 NFT):** At the exact same time, the protocol mints 5 NFTs into the creator's MetaMask. These NFTs do NOT hold any crypto. They act as the cryptographic "Key" to the Vault.
 3. **The Lock (`onlyOwner`):** The Vault is programmed with a single rule: *"I will only obey the Ethereum address that currently holds my corresponding NFT."* 
 
-### Selling a Partition
+### Selling a Partition OTC
 If you list your Partition NFT on the Liquid Terminal Marketplace and sell it to a buyer:
 1. The NFT moves from your MetaMask to the Buyer's MetaMask.
 2. The ETH **never moves**. It remains safely inside the Smart Contract Vault.
@@ -29,44 +29,36 @@ If you list your Partition NFT on the Liquid Terminal Marketplace and sell it to
 
 ## Core Concepts & Mechanisms
 
-### 1. The Value Peg & The "Empty Shell" Risk
-The value of a Liquid Partition NFT is **100% pegged to the live balance inside the Vault.**
-If the Vault contains 2 ETH, the absolute minimum floor price of that NFT is 2 ETH, because any buyer could purchase the NFT, open the vault, and withdraw the 2 ETH.
+### 1. USDC Marketplace Settlement
+The Liquid Terminal Marketplace settles all OTC trades in **USDC Stablecoins**. Sellers list their ETH Vaults for a fixed USDC asking price. Buyers must approve and spend native Arbitrum USDC (`0xaf88...`) to acquire the Vaults. This provides a clean mechanism to calculate arbitrage or discount opportunities.
 
-However, the value can drop to zero if the owner decides to drain the Vault. 
-* If you own an NFT, you can press "Withdraw" to sweep the 2 ETH into your personal MetaMask.
-* Your Vault now contains 0 ETH.
-* If you attempt to sell the NFT now, it is essentially a worthless "empty shell."
+### 2. Live Chainlink Oracles & Arbitrage
+The Liquid Terminal UI connects directly to live **Chainlink Data Feeds** to calculate the real-time USD Net Asset Value (NAV) of every Vault. When browsing the orderbook, buyers can instantly see if a Vault is listed at a discount (Guaranteed Arbitrage) or at a premium to its underlying assets.
 
-**Buyer Protection:** The Liquid Terminal Marketplace and Dashboard actively read the *live balance* of the underlying Smart Contract Wallet. If a seller drains their vault before a sale, the UI immediately displays a `0 ETH` balance, protecting buyers from purchasing empty shells.
-
-### 2. Gas Costs & Network Constraints
-**Why Arbitrum One?**
-Deploying a full Smart Contract Vault for every partition is highly gas-intensive.
-* **On Ethereum Mainnet:** Deploying 5 Partition Vaults would cost ~$30 to $80 in gas.
-* **On Arbitrum One:** Thanks to L2 data compression, deploying 5 Partition Vaults + minting 5 NFTs costs a fraction of a cent (~$0.02 to $0.05 total). Arbitrum makes this protocol economically viable for retail.
-
-**Network Confinement:**
-Smart contracts are strictly confined to the blockchain they are deployed on. Liquid Partitions deployed on Arbitrum can **only** hold Arbitrum assets (Arbitrum ETH, USDC, ARB) and can **only** interact with Arbitrum DeFi protocols. They cannot interact with Ethereum Mainnet assets.
+### 3. The "Empty Shell" Mechanic & Permanent Reusability
+The value of a Liquid Partition NFT is 100% pegged to the live balance inside the Vault.
+If you withdraw the assets from your Vault, it drops to 0 ETH.
+* **Buyer Protection:** The UI reads the live on-chain balance of the vault. If a seller drains their vault, it is flagged as an `EMPTY SHELL` and buying is disabled to protect users.
+* **Reusability vs Cleanup:** Even when empty, the Vault remains a fully functional Smart Contract Wallet. You can deposit new assets into it anytime. If you don't want the clutter, you can use the **Discard Empty Vault** feature in the Portfolio UI to permanently burn the NFT to the `0x00...dEaD` address.
 
 ---
 
 ## Technical Stack
 - **Smart Contracts:** Foundry, Solidity ^0.8.20, OpenZeppelin (ERC721, ReentrancyGuard).
-- **Frontend:** Next.js 14, TailwindCSS, Wagmi, Viem.
-- **Network:** Arbitrum One (L2) / Anvil (Local).
+- **Frontend:** Next.js 14, TailwindCSS, Wagmi v3, Viem.
+- **Network:** Arbitrum One (L2) / Chain ID: `42161`
 
 ## Contract Overview
 1. **`PartitionFactory.sol`**: An `ERC721Enumerable` NFT contract. Receives bulk ETH, deploys `PartitionWallet` contracts, and mints the NFT Keys to the user.
 2. **`PartitionWallet.sol`**: A Smart Contract Wallet that delegates its `onlyOwner` access control directly to `PartitionFactory.ownerOf(tokenId)`. Contains `withdrawETH`, `withdrawERC20`, and a generic `executeCall` for DeFi interactions.
-3. **`Marketplace.sol`**: An on-chain orderbook that allows users to list their Partition NFTs for a fixed ETH price. Facilitates atomic swaps between buyer ETH and seller NFTs.
+3. **`Marketplace.sol`**: An on-chain orderbook that allows users to list their Partition NFTs for a fixed **USDC** price. Facilitates atomic swaps between buyer USDC and seller NFTs.
 
 ---
 
 ## Roadmap & Upcoming Features
 
-### Coming Soon: Multi-Asset Support (USDC, ARB, WBTC)
-Currently, Liquid Terminal supports partitioning native Ethereum (ETH). In the next major update, we will introduce `createPartitionsERC20`, allowing institutional whales to fragment and OTC trade massive blocks of stablecoins (USDC) and other Arbitrum-native tokens without crashing DEX liquidity pools.
+### Multi-Asset Vault Initialization
+Currently, Liquid Terminal supports partitioning native Ethereum (ETH) upon creation. In the next major update, we will introduce `createPartitionsERC20`, allowing institutional whales to fragment and OTC trade massive blocks of stablecoins and Arbitrum-native tokens without crashing DEX liquidity pools.
 
 ---
 
