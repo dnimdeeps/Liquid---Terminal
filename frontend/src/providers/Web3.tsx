@@ -1,8 +1,7 @@
 'use client';
 
 import '@rainbow-me/rainbowkit/styles.css';
-import { connectorsForWallets, RainbowKitProvider, darkTheme } from '@rainbow-me/rainbowkit';
-import { phantomWallet, injectedWallet, metaMaskWallet, coinbaseWallet, walletConnectWallet } from '@rainbow-me/rainbowkit/wallets';
+import { getDefaultConfig, RainbowKitProvider, darkTheme } from '@rainbow-me/rainbowkit';
 import { createConfig, http, WagmiProvider } from 'wagmi';
 import { arbitrum } from 'wagmi/chains';
 import { QueryClientProvider, QueryClient } from '@tanstack/react-query';
@@ -10,19 +9,9 @@ import { useState } from 'react';
 
 const projectId = 'c07834ce800f0fdcea34e46cfe3ef082';
 
-const connectors = connectorsForWallets(
-  [
-    {
-      groupName: 'Recommended',
-      wallets: [metaMaskWallet, phantomWallet, injectedWallet, coinbaseWallet, walletConnectWallet],
-    },
-  ],
-  { appName: 'Liquid Terminal', projectId }
-);
-
-// Arbitrum One only — single-chain protocol
-const config = createConfig({
-  connectors,
+const config = getDefaultConfig({
+  appName: 'Liquid Terminal',
+  projectId,
   chains: [arbitrum],
   transports: {
     [arbitrum.id]: http('https://arb1.arbitrum.io/rpc'),

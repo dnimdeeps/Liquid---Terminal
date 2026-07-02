@@ -7,14 +7,56 @@ import { parseEther } from 'viem';
 import { CONTRACTS, FACTORY_ABI } from '@/lib/contracts';
 import { useProtocolStats } from '@/lib/useProtocolStats';
 import { ProtocolStatsBar } from '@/components/ProtocolStatsBar';
+import { useEffect, useState } from 'react';
+
+const CHAINLINK_ETH_USD_ABI = [
+  { inputs: [], name: 'latestRoundData', outputs: [{ internalType: 'uint80', name: 'roundId', type: 'uint80' }, { internalType: 'int256', name: 'answer', type: 'int256' }, { internalType: 'uint256', name: 'startedAt', type: 'uint256' }, { internalType: 'uint256', name: 'updatedAt', type: 'uint256' }, { internalType: 'uint80', name: 'answeredInRound', type: 'uint80' }], stateMutability: 'view', type: 'function' }
+] as const;
 
 export default function Terminal() {
   const [totalEth, setTotalEth] = useState('10');
+  const [usdcEquivalent, setUsdcEquivalent] = useState('');
   const [partitions, setPartitions] = useState('5');
   const [txError, setTxError] = useState<string | null>(null);
 
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
+
+  // Fetch ETH/USD price from Chainlink Arbitrum
+  const { data: priceData } = useReadContract({
+    address: '0x639Fe6ab55C921f74e7fac1ee960C0B6293ba612',
+    abi: CHAINLINK_ETH_USD_ABI,
+    functionName: 'latestRoundData',
+    query: { refetchInterval: 30000 },
+  });
+
+  const ethPriceUsd = priceData ? Number(priceData[1]) / 1e8 : 0;
+
+  // Sync initial USDC value once price loads
+  useEffect(() => {
+    if (ethPriceUsd > 0 && totalEth && !usdcEquivalent) {
+      setUsdcEquivalent((Number(totalEth) * ethPriceUsd).toFixed(2));
+    }
+  }, [ethPriceUsd]);
+
+  const handleEthChange = (val: string) => {
+    if (Number(val) < 0) return;
+    setTotalEth(val);
+    if (ethPriceUsd > 0 && val) setUsdcEquivalent((Number(val) * ethPriceUsd).toFixed(2));
+    else setUsdcEquivalent('');
+  };
+
+  const handleUsdcChange = (val: string) => {
+    if (Number(val) < 0) return;
+    setUsdcEquivalent(val);
+    if (ethPriceUsd > 0 && val) setTotalEth((Number(val) / ethPriceUsd).toFixed(4));
+    else setTotalEth('');
+  };
+
+  const handlePartitionsChange = (val: string) => {
+    if (Number(val) < 0) return;
+    setPartitions(val);
+  };
 
   const numPartitions = Math.min(Math.max(Number(partitions) || 1, 1), 60);
   const ethPerPartition = Number(totalEth) / numPartitions || 0;
@@ -93,17 +135,32 @@ export default function Terminal() {
             <div className="space-y-10">
               <div>
                 <label className="flex justify-between text-[10px] text-[#888888] uppercase tracking-[0.2em] mb-3">
-                  <span>Source Capital (ETH)</span>
+                  <span>Source Capital</span>
                   {isConnected && <span className="text-[#D4AF37]">Wallet Connected</span>}
                 </label>
-                <div className="relative">
-                  <input
-                    type="number"
-                    value={totalEth}
-                    onChange={(e) => setTotalEth(e.target.value)}
-                    className="w-full bg-transparent border-b border-[#2A2A2A] text-white text-4xl p-3 pl-0 font-serif focus:border-[#D4AF37] focus:outline-none transition-colors"
-                  />
-                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[#D4AF37]/50 font-serif text-2xl">Ξ</span>
+                <div className="flex gap-4">
+                  <div className="relative flex-1">
+                    <input
+                      type="number"
+                      min="0"
+                      value={totalEth}
+                      onChange={(e) => handleEthChange(e.target.value)}
+                      className="w-full bg-transparent border-b border-[#2A2A2A] text-white text-3xl p-3 pl-0 font-serif focus:border-[#D4AF37] focus:outline-none transition-colors"
+                      placeholder="0.00"
+                    />
+                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[#D4AF37]/50 font-serif text-xl">Ξ</span>
+                  </div>
+                  <div className="relative flex-1">
+                    <input
+                      type="number"
+                      min="0"
+                      value={usdcEquivalent}
+                      onChange={(e) => handleUsdcChange(e.target.value)}
+                      className="w-full bg-transparent border-b border-[#2A2A2A] text-white text-3xl p-3 pl-0 font-serif focus:border-green-400 focus:outline-none transition-colors"
+                      placeholder="0.00"
+                    />
+                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[#888888] font-mono text-xs uppercase tracking-widest">USDC</span>
+                  </div>
                 </div>
               </div>
 
@@ -115,8 +172,10 @@ export default function Terminal() {
                 <div className="relative">
                   <input
                     type="number"
+                    min="1"
+                    max="60"
                     value={partitions}
-                    onChange={(e) => setPartitions(e.target.value)}
+                    onChange={(e) => handlePartitionsChange(e.target.value)}
                     className="w-full bg-transparent border-b border-[#2A2A2A] text-white text-4xl p-3 pl-0 font-serif focus:border-[#D4AF37] focus:outline-none transition-colors"
                   />
                   <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[#888888] font-mono text-xs uppercase tracking-widest">Wallets</span>
@@ -126,7 +185,10 @@ export default function Terminal() {
               <div className="pt-8 border-t border-[#D4AF37]/10 space-y-3">
                 <div className="flex justify-between items-end">
                   <span className="text-[10px] uppercase tracking-[0.3em] text-[#888888]">Size per Vault</span>
-                  <span className="font-serif text-4xl text-[#D4AF37]">{ethPerPartition.toFixed(4)}</span>
+                  <div className="text-right">
+                    <div className="font-serif text-4xl text-[#D4AF37]">{ethPerPartition.toFixed(4)} <span className="text-xl">ETH</span></div>
+                    {ethPriceUsd > 0 && <div className="text-xs font-mono text-green-400 mt-1">≈ ${(ethPerPartition * ethPriceUsd).toFixed(2)} USDC</div>}
+                  </div>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <div className="border border-[#1A1A1A] bg-[#0A0A0A] p-2">
