@@ -218,7 +218,20 @@ function ListingRow({ index, listing, address, isConnected, marketplaceAddress, 
   
   const hasAllowance = allowance !== undefined && (allowance as bigint) >= listing.price;
 
+  // Get USDC Balance
+  const { data: usdcBalance } = useReadContract({
+    address: usdcAddress,
+    abi: ERC20_ABI,
+    functionName: 'balanceOf',
+    args: address ? [address] : undefined,
+    query: { refetchInterval: 10000 }
+  });
+  
+  const hasEnoughUsdc = usdcBalance !== undefined && (usdcBalance as bigint) >= listing.price;
+
   const handleAction = () => {
+    if (!hasEnoughUsdc) return;
+    
     if (!hasAllowance) {
       writeContract({
         address: usdcAddress,
@@ -296,13 +309,15 @@ function ListingRow({ index, listing, address, isConnected, marketplaceAddress, 
 
       <div className="text-right pr-4 flex flex-col items-end gap-1">
         <button
-          disabled={!isConnected || isPending || isConfirming || (isConnected && sellerAddr === address) || balanceNumber === 0} 
+          disabled={!isConnected || isPending || isConfirming || (isConnected && sellerAddr === address) || balanceNumber === 0 || !hasEnoughUsdc} 
           onClick={handleAction}
           className="relative overflow-hidden border border-[#2A2A2A] text-[#888888] text-[9px] font-mono uppercase tracking-[0.2em] px-6 py-2 hover:border-[#D4AF37] hover:bg-[#D4AF37] hover:text-black transition-all disabled:opacity-40 disabled:cursor-not-allowed group/btn w-full max-w-[120px]"
         >
           <span className="relative z-10 flex items-center justify-center gap-2">
             {isPending || isConfirming ? (
                <><span className="w-2 h-2 bg-black rounded-full animate-pulse"></span>...</>
+            ) : !hasEnoughUsdc ? (
+              <span className="text-red-400">Not Enough USDC</span>
             ) : !hasAllowance ? '1. Approve' : '2. Acquire'}
           </span>
           <div className="absolute inset-0 bg-white/20 translate-y-full group-hover/btn:translate-y-0 transition-transform duration-300 ease-out"></div>
