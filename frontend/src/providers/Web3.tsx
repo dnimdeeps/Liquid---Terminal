@@ -1,7 +1,8 @@
 'use client';
 
 import '@rainbow-me/rainbowkit/styles.css';
-import { getDefaultConfig, RainbowKitProvider, darkTheme } from '@rainbow-me/rainbowkit';
+import { connectorsForWallets, RainbowKitProvider, darkTheme } from '@rainbow-me/rainbowkit';
+import { phantomWallet, injectedWallet } from '@rainbow-me/rainbowkit/wallets';
 import { createConfig, http, WagmiProvider } from 'wagmi';
 import { arbitrum } from 'wagmi/chains';
 import { QueryClientProvider, QueryClient } from '@tanstack/react-query';
@@ -9,9 +10,18 @@ import { useState } from 'react';
 
 const projectId = 'c07834ce800f0fdcea34e46cfe3ef082';
 
-const config = getDefaultConfig({
-  appName: 'Liquid Terminal',
-  projectId,
+const connectors = connectorsForWallets(
+  [
+    {
+      groupName: 'Recommended',
+      wallets: [injectedWallet, phantomWallet],
+    },
+  ],
+  { appName: 'Liquid Terminal', projectId }
+);
+
+const config = createConfig({
+  connectors,
   chains: [arbitrum],
   transports: {
     [arbitrum.id]: http('https://arb1.arbitrum.io/rpc'),
