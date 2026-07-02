@@ -257,6 +257,21 @@ function PartitionCard({ index, partition, factoryAddress, marketplaceAddress, a
     });
   };
 
+  const handleDiscard = () => {
+    setGlobalError(null);
+    writeContract({
+        address: factoryAddress,
+        abi: [{
+            name: 'transferFrom',
+            type: 'function',
+            stateMutability: 'nonpayable',
+            inputs: [{ name: 'from', type: 'address' }, { name: 'to', type: 'address' }, { name: 'tokenId', type: 'uint256' }]
+        }],
+        functionName: 'transferFrom',
+        args: [address, '0x000000000000000000000000000000000000dEaD', partition.tokenId],
+    });
+  };
+
   const arbscanVault = `https://arbiscan.io/address/${partition.walletAddr}`;
 
   return (
@@ -436,6 +451,20 @@ function PartitionCard({ index, partition, factoryAddress, marketplaceAddress, a
             <div className="text-[9px] text-green-400 font-mono flex items-center gap-1">
               <Zap size={10}/> Confirmed · TX: {txHash?.slice(0, 18)}...
               <a href={`https://arbiscan.io/tx/${txHash}`} target="_blank" rel="noopener noreferrer" className="hover:text-green-300 ml-1"><ExternalLink size={9}/></a>
+            </div>
+          )}
+
+          {balanceNum === 0 && (
+            <div className="mt-2 pt-4 border-t border-red-500/10">
+              <label className="block text-[9px] font-mono text-red-500/70 uppercase tracking-[0.2em] mb-1">Cleanup / Burn</label>
+              <p className="text-[8px] text-[#555555] font-mono mb-2">This is a permanent, reusable Smart Wallet! You can deposit ETH into it anytime. However, if you want to remove this empty shell from your portfolio permanently, you can discard it.</p>
+              <button 
+                onClick={handleDiscard}
+                disabled={isPending || isConfirming}
+                className="w-full border border-red-500/30 text-red-500/70 px-3 py-2 text-[9px] font-mono uppercase hover:bg-red-500/10 hover:border-red-500 hover:text-red-400 transition-colors"
+              >
+                Permanently Discard Empty Vault
+              </button>
             </div>
           )}
         </div>
