@@ -330,7 +330,7 @@ function PartitionCard({ index, partition, factoryAddress, marketplaceAddress, a
         </div>
 
         {/* Right: Actions */}
-        <div className="flex flex-col gap-4 min-w-[300px] w-full lg:w-auto border-t lg:border-t-0 lg:border-l border-[#1A1A1A] pt-6 lg:pt-0 lg:pl-8">
+        <div className="flex flex-col gap-4 min-w-[300px] w-full lg:w-[450px] border-t lg:border-t-0 lg:border-l border-[#1A1A1A] pt-6 lg:pt-0 lg:pl-8">
 
           {/* Withdraw */}
           <div className="mb-6">
