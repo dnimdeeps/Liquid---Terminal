@@ -213,7 +213,7 @@ export default function Terminal() {
                       <span className="text-[11px] font-serif text-[#FDF5E6]">{ethPerPartition.toFixed(2)}</span>
                       <span className="text-[7px] font-mono text-[#D4AF37]/50">ETH</span>
                     </div>
-                    {isConfirmed && (userPartitions as string[] | undefined)?.[i] && (
+                    {isConfirmed && (
                       <span className="mt-1 text-[7px] font-mono text-green-400 opacity-70">✓ Live</span>
                     )}
                   </div>
