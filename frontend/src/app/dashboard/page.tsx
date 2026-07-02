@@ -10,6 +10,10 @@ import { useProtocolStats } from '@/lib/useProtocolStats';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Key, Lock, ArrowUpRight, ShieldAlert, Zap, Wallet, Tag, BarChart3, TrendingUp, ExternalLink } from 'lucide-react';
 
+const CHAINLINK_ETH_USD_ABI = [
+  { inputs: [], name: 'latestRoundData', outputs: [{ internalType: 'uint80', name: 'roundId', type: 'uint80' }, { internalType: 'int256', name: 'answer', type: 'int256' }, { internalType: 'uint256', name: 'startedAt', type: 'uint256' }, { internalType: 'uint256', name: 'updatedAt', type: 'uint256' }, { internalType: 'uint80', name: 'answeredInRound', type: 'uint80' }], stateMutability: 'view', type: 'function' }
+] as const;
+
 export default function Dashboard() {
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
@@ -195,6 +199,32 @@ function PartitionCard({ index, partition, factoryAddress, marketplaceAddress, a
   const balanceNum = Number(balanceEth);
   const lastUpdated = dataUpdatedAt ? new Date(dataUpdatedAt).toLocaleTimeString() : '—';
 
+  // Fetch ETH/USD price from Chainlink
+  const { data: priceData } = useReadContract({
+    address: '0x639Fe6ab55C921f74e7fac1ee960C0B6293ba612',
+    abi: CHAINLINK_ETH_USD_ABI,
+    functionName: 'latestRoundData',
+    query: { refetchInterval: 30000 },
+  });
+  const ethPriceUsd = priceData ? Number(priceData[1]) / 1e8 : 0;
+  const vaultUsdcValue = balanceNum * ethPriceUsd;
+
+  const handleWithdrawAmountChange = (val: string) => {
+    if (Number(val) < 0) return;
+    setWithdrawAmount(val);
+  };
+
+  const handleListPriceChange = (val: string) => {
+    if (Number(val) < 0) return;
+    setListPrice(val);
+  };
+
+  const setWithdrawPercent = (percent: number) => {
+    if (balanceNum > 0) {
+      setWithdrawAmount((balanceNum * percent).toFixed(6).replace(/\.?0+$/, ''));
+    }
+  };
+
   const handleWithdraw = () => {
     if (!withdrawAmount) return;
     setGlobalError(null);
@@ -274,6 +304,7 @@ function PartitionCard({ index, partition, factoryAddress, marketplaceAddress, a
             <div className="border border-[#1A1A1A] bg-[#0A0A0A] p-3">
               <div className="text-[8px] font-mono text-[#555555] uppercase tracking-[0.15em] mb-1">Live Vault NAV</div>
               <div className="text-xl font-serif text-white">{balanceNum.toFixed(4)} <span className="text-[9px] font-mono text-[#D4AF37]">ETH</span></div>
+              {ethPriceUsd > 0 && <div className="text-[9px] font-mono text-green-400 mt-1">≈ ${vaultUsdcValue.toFixed(2)} USDC</div>}
             </div>
             <div className="border border-[#1A1A1A] bg-[#0A0A0A] p-3">
               <div className="text-[8px] font-mono text-[#555555] uppercase tracking-[0.15em] mb-1">Raw Balance (Wei)</div>
@@ -302,17 +333,33 @@ function PartitionCard({ index, partition, factoryAddress, marketplaceAddress, a
         <div className="flex flex-col gap-4 min-w-[300px] w-full lg:w-auto border-t lg:border-t-0 lg:border-l border-[#1A1A1A] pt-6 lg:pt-0 lg:pl-8">
 
           {/* Withdraw */}
-          <div>
-            <label className="block text-[9px] font-mono text-[#888888] uppercase tracking-[0.2em] mb-2 flex items-center gap-1">
-              <ArrowUpRight size={10}/> Extract Liquidity
+          <div className="mb-6">
+            <label className="block text-[9px] font-mono text-[#888888] uppercase tracking-[0.2em] mb-1 flex items-center justify-between">
+              <span className="flex items-center gap-1"><ArrowUpRight size={10}/> Extract Liquidity</span>
+              <span className="text-[#D4AF37]">Max: {balanceNum.toFixed(4)} ETH</span>
             </label>
+            <p className="text-[8px] text-[#555555] font-mono mb-2">Withdraw underlying ETH from this Smart Wallet directly to your personal address.</p>
+            
+            <div className="flex gap-2 mb-2">
+              {[0.25, 0.50, 0.75, 1].map((pct) => (
+                <button 
+                  key={pct}
+                  onClick={() => setWithdrawPercent(pct)}
+                  className="flex-1 border border-[#2A2A2A] bg-[#0A0A0A] text-[8px] font-mono text-[#888888] py-1 hover:border-[#D4AF37] hover:text-[#D4AF37] transition-colors"
+                >
+                  {pct === 1 ? 'MAX' : `${pct * 100}%`}
+                </button>
+              ))}
+            </div>
+
             <div className="flex gap-2">
               <div className="relative flex-1">
                 <input 
                   type="number" 
+                  min="0"
                   placeholder="0.00" 
                   value={withdrawAmount}
-                  onChange={(e) => setWithdrawAmount(e.target.value)}
+                  onChange={(e) => handleWithdrawAmountChange(e.target.value)}
                   className="w-full bg-transparent border border-[#2A2A2A] px-3 py-2 text-sm font-mono focus:border-[#D4AF37] outline-none text-white transition-colors"
                 />
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-mono text-[#555555]">ETH</span>
@@ -334,19 +381,27 @@ function PartitionCard({ index, partition, factoryAddress, marketplaceAddress, a
 
           {/* List */}
           <div>
-            <label className="block text-[9px] font-mono text-[#888888] uppercase tracking-[0.2em] mb-2 flex items-center gap-1">
-              <Tag size={10}/> OTC Market Listing (USDC)
+            <label className="block text-[9px] font-mono text-[#888888] uppercase tracking-[0.2em] mb-1 flex items-center justify-between">
+              <span className="flex items-center gap-1"><Tag size={10}/> OTC Market Listing</span>
+              {ethPriceUsd > 0 && <span className="text-[#D4AF37]">Vault Value: ≈${vaultUsdcValue.toFixed(2)}</span>}
             </label>
+            <p className="text-[8px] text-[#555555] font-mono mb-2 leading-relaxed">List this entire NFT Vault for sale on the decentralized OTC marketplace. Buyers will pay you the exact USDC asking price below to take full ownership of the vault and its ETH contents.</p>
             <div className="flex gap-2">
               <div className="relative flex-1">
                 <input 
                   type="number" 
+                  min="0"
                   placeholder="Asking Price" 
                   value={listPrice}
-                  onChange={(e) => setListPrice(e.target.value)}
-                  className="w-full bg-transparent border border-[#2A2A2A] px-3 py-2 text-sm font-mono focus:border-[#D4AF37] outline-none text-white transition-colors"
+                  onChange={(e) => handleListPriceChange(e.target.value)}
+                  className="w-full h-[54px] bg-transparent border border-[#2A2A2A] px-3 py-2 text-sm font-mono focus:border-[#D4AF37] outline-none text-white transition-colors"
                 />
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-mono text-[#555555]">USDC</span>
+                {ethPriceUsd > 0 && listPrice && (
+                  <div className="absolute left-3 -bottom-5 text-[8px] font-mono text-green-400/70">
+                    ≈ {(Number(listPrice) / ethPriceUsd).toFixed(4)} ETH equivalent
+                  </div>
+                )}
               </div>
               <div className="flex flex-col gap-1">
                 <button 
