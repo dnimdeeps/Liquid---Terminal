@@ -1,9 +1,8 @@
 # Liquid Terminal: Token-Bound OTC Protocol
 
 
-## https://liquid-terminal-e-roan.vercel.app/
 
-**[✨ LIVE DEMO: Experience this proposal ✨](https://liquid-terminal-e-roan.vercel.app/)**
+## **[✨ LIVE LIQUID--TERMINAL ✨](https://liquid-terminal-e-roan.vercel.app/)**
 ## Executive Summary
 Liquid Terminal is a decentralized Over-The-Counter (OTC) marketplace designed to bridge institutional liquidity with retail buyers. It allows users with large asset holdings to partition their capital into smaller, fixed-balance smart contract vaults. 
 
